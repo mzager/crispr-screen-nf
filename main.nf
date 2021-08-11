@@ -16,14 +16,18 @@ params.scale_cutoff = 1
 params.skip_flute = false
 params.treatname = false
 params.ctrlname = false
+params.trim_3_prime = -8
+params.trim_5_prime = 32
 
 // Space delimited list of file endings to be removed from
 // FASTQ file names to yield the samples names that they
 // correspond to
-params.suffix_list = "gz fq fastq fna fasta"
+params.suffix_list = "trimmed gz fq fastq fna fasta"
 
 // Import the modules
 include {
+    cutadapt_trim as treatment_cutadapt_trim;
+    cutadapt_trim as control_cutadapt_trim;
     mageck as treatment_mageck;
     mageck as control_mageck;
     join_counts;
@@ -33,6 +37,8 @@ include {
     mageck_flute_rra;
     mageck_flute_mle;
 } from './modules' params(
+    trim_3_prime: params.trim_3_prime,
+    trim_5_prime: params.trim_5_prime,
     suffix_list: params.suffix_list,
     output: params.output,
     output_prefix: params.output_prefix,
@@ -59,6 +65,8 @@ Required Arguments:
     --output_prefix     Prefix for all output files
 
 Optional Arguments:
+    --trim_5_prime      Amount to trim from 5 prime end (32)
+    --trim_3_prime      Amount to trim from 3 prime end (-8)
     --ntc_list          Path to file describing negative controls
                             As described in https://sourceforge.net/p/mageck/wiki/input/#negative-control-sgrna-list
     --mle_designmat     To use MAGeCK-mle to call gene essentiality, use this flag
@@ -159,14 +167,20 @@ workflow {
         .fromPath(params.library)
         .set{sgrna_library}
 
+    // Trim Treatment Reads Using Cut Adapt
+    treatment_cutadapt_trim(treatment_reads_ch)
+
     // Run MAGeCK on the treatment FASTQ files
     treatment_mageck(
-        treatment_reads_ch.combine(sgrna_library)
+        treatment_cutadapt_trim.out.combine(sgrna_library)
     )
+
+    // Trim Control Reads Using Cut Adapt
+    control_cutadapt_trim(control_reads_ch)
 
     // Run MAGeCK on the control FASTQ files
     control_mageck(
-        control_reads_ch.combine(sgrna_library)
+        control_cutadapt_trim.out.combine(sgrna_library)
     )
 
     // Join together the counts from all samples

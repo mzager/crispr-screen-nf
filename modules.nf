@@ -1,6 +1,36 @@
 // Container used to run mageck
 mageck_container = "quay.io/biocontainers/mageck:0.5.9.4--py38h8c62d01_1"
 mageckflute_container = "quay.io/biocontainers/bioconductor-mageckflute:1.12.0--r41hdfd78af_0"
+cutadapt_container = " quay.io/biocontainers/cutadapt:3.4--py37h73a75cf_1"
+
+// Trim Adapters Given Fixed 3' and 5' lengths
+process cutadapt_trim { 
+    container "${cutadapt_container}"
+    label "mem_medium"
+    publishDir "${params.output}", mode: "copy", overwrite: "true"
+
+    input:
+        file(fastq)
+
+    output: 
+        file "${fastq.name}.trimmed"
+
+    script:
+"""/bin/bash
+
+set -Eeuo pipefail
+echo FASTQ file is ${fastq.name}
+echo Prime5 is ${params.trim_5_prime}
+echo Prime3 is ${params.trim_3_prime}
+
+cutadapt \
+    -u "${params.trim_5_prime}" \
+    -u "${params.trim_3_prime}" \
+    -o "${fastq.name}.trimmed" "${fastq.name}" \
+
+"""
+
+}
 
 // Process used to run MAGeCK count
 process mageck {
